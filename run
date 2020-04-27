@@ -1,0 +1,54 @@
+#!/bin/bash
+
+set -e
+
+image=myimage
+imagenet=/mdata/imagenet-raw
+
+cmd_build() { # build the container
+set -x
+docker build -t $image-base . -f Dockerfile.base
+docker build --no-cache -t $image . -f Dockerfile
+#docker tag $image $remote
+#docker push $remote
+}
+
+cmd_run() { # run shell or command in image container locally
+mkdir -p ./.cache
+
+docker run -ti \
+    --rm \
+    --runtime=nvidia \
+    -v $(pwd)/.cache:/home/tmb/.cache \
+    -v /etc/passwd:/etc/passwd \
+    -v /etc/shadow:/etc/shadow \
+    -v /etc/group:/etc/group \
+    -v /etc/sudoers:/etc/sudoers \
+    -u "$(id -u):$(id -g)" \
+    -v /tmp/.X11-unix:/tmp/.X11-unix \
+    -v $imagenet:/imagenet \
+    -v /work-2020:/work-2020 \
+    -v "$HOME:$HOME" \
+    -w "$(pwd)" \
+    --net host \
+    --ipc host \
+    -e DISPLAY="$DISPLAY" \
+    $image \
+    "$@"
+}
+
+cmd_lab() { # run jupyterlab
+    cmd_run jupyter lab "$@"
+}
+
+cmd_help() { # help message
+echo
+echo available commands:
+echo
+grep '^cmd_[_0-9a-z]*() {' $0 | sed 's/cmd_//;s/\(.*\)() *{* *#* */\1 -- /'
+}
+
+cmd=$1
+shift
+eval "cmd_$cmd"
+
